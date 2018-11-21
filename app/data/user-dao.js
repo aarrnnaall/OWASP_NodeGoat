@@ -17,17 +17,18 @@ function UserDAO(db) {
     this.addUser = function(userName, firstName, lastName, password, email, callback) {
 
         // Create user document
+        var salt = bcrypt.genSaltSync();
+        var passwordHash = bcrypt.hashSync(password, salt);
+
         var user = {
             userName: userName,
             firstName: firstName,
             lastName: lastName,
             benefitStartDate: this.getRandomFutureDate(),
-            password: password //received from request param
-            /*
-            // Fix for A2-1 - Broken Auth
-            // Stores password  in a safer way using one way encryption and salt hashing
-            password: bcrypt.hashSync(password, bcrypt.genSaltSync())
-            */
+            //A2-1 - Broken Auth
+            password: passwordHash
+
+
         };
 
         // Add email if set
@@ -64,47 +65,35 @@ function UserDAO(db) {
 
     this.validateLogin = function(userName, password, callback) {
 
-        // Helper function to compare passwords
-        function comparePassword(fromDB, fromUser) {
-            return fromDB === fromUser;
-            /*
-            // Fix for A2-Broken Auth
-            // compares decrypted password stored in this.addUser()
-            return bcrypt.compareSync(fromDB, fromUser);
-            */
-        }
-
         // Callback to pass to MongoDB that validates a user document
         function validateUserDoc(err, user) {
 
             if (err) return callback(err, null);
 
             if (user) {
-                if (comparePassword(password, user.password)) {
+                //A2-Broken Auth
+                if (bcrypt.compareSync(password, user.password)) {
                     callback(null, user);
                 } else {
                     var invalidPasswordError = new Error("Invalid password");
-                    // Set an extra field so we can distinguish this from a db error
                     invalidPasswordError.invalidPassword = true;
                     callback(invalidPasswordError, null);
                 }
             } else {
                 var noSuchUserError = new Error("User: " + user + " does not exist");
-                // Set an extra field so we can distinguish this from a db error
                 noSuchUserError.noSuchUser = true;
                 callback(noSuchUserError, null);
             }
         }
 
-        usersCol.findOne({
+        users.findOne({
             userName: userName
         }, validateUserDoc);
     };
 
-    // This is the good one, see the next function
     this.getUserById = function(userId, callback) {
-        usersCol.findOne({
-            _id: parseInt(userId)
+        users.findOne({
+            userId: userId
         }, callback);
     };
 
