@@ -16,7 +16,6 @@ var marked = require("marked");
 var app = express(); // Web framework to handle routing requests
 var routes = require("./app/routes");
 var config = require("./config/config"); // Application config properties
-
 /*
 // Fix for A6-Sensitive Data Exposure
 // Load keys for establishing secure HTTPS connection
