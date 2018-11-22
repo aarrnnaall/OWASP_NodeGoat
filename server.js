@@ -4,21 +4,24 @@ var express = require("express");
 var favicon = require("serve-favicon");
 var bodyParser = require("body-parser");
 var session = require("express-session");
-// var csrf = require('csurf');
+var cookieParser = require('cookie-parser');
+var csrf = require('csurf');
 var consolidate = require("consolidate"); // Templating library adapter for Express
 var swig = require("swig");
-// var helmet = require("helmet");
+var helmet = require("helmet");
+
 var MongoClient = require("mongodb").MongoClient; // Driver for connecting to MongoDB
 var http = require("http");
 var marked = require("marked");
-//var helmet = require("helmet");
 //var nosniff = require('dont-sniff-mimetype');
 var app = express(); // Web framework to handle routing requests
 var routes = require("./app/routes");
 var config = require("./config/config"); // Application config properties
-/*
-// Fix for A6-Sensitive Data Exposure
-// Load keys for establishing secure HTTPS connection
+//A2-2 Broken Auth
+app.use(cookieParser());
+
+
+// A6-Sensitive Data Exposure
 var fs = require("fs");
 var https = require("https");
 var path = require("path");
@@ -26,7 +29,7 @@ var httpsOptions = {
     key: fs.readFileSync(path.resolve(__dirname, "./artifacts/cert/server.key")),
     cert: fs.readFileSync(path.resolve(__dirname, "./artifacts/cert/server.crt"))
 };
-*/
+
 
 MongoClient.connect(config.db, function(err, db) {
     if (err) {
@@ -37,22 +40,16 @@ MongoClient.connect(config.db, function(err, db) {
     }
     console.log("Connected to the database: " + config.db);
 
-    /*
-    // Fix for A5 - Security MisConfig
-    // TODO: Review the rest of helmet options, like "xssFilter"
-    // Remove default x-powered-by response header
+
+    // A5 - Security MisConfig
     app.disable("x-powered-by");
 
-    // Prevent opening page in frame or iframe to protect from clickjacking
-    app.use(helmet.xframe());
+    app.use(helmet.frameguard());
 
-    // Prevents browser from caching and storing page
     app.use(helmet.noCache());
 
-    // Allow loading resources only from white-listed domains
-    app.use(helmet.csp());
+    app.use(helmet.contentSecurityPolicy);
 
-    // Allow communication only on HTTPS
     app.use(helmet.hsts());
 
     // TODO: Add another vuln: https://github.com/helmetjs/helmet/issues/26
@@ -63,8 +60,8 @@ MongoClient.connect(config.db, function(err, db) {
     // app.use(helmet.xssFilter({ setOnOldIE: true }));
 
     // Forces browser to only use the Content-Type set in the response header instead of sniffing or guessing it
-    app.use(nosniff());
-    */
+    app.use(helmet.noSniff());
+
 
     // Adding/ remove HTTP Headers for security
     app.use(favicon(__dirname + "/app/assets/favicon.ico"));
@@ -76,43 +73,26 @@ MongoClient.connect(config.db, function(err, db) {
         extended: false
     }));
 
-    // Enable session management using express middleware
+    // A3 - XSS
+    app.set('trust proxy', 1);// trust first proxy
     app.use(session({
-        // genid: function(req) {
-        //    return genuuid() // use UUIDs for session IDs
-        //},
-        secret: config.cookieSecret,
-        // Both mandatory in Express v4
+        secret: 'keyboard cat',
+        resave: false,
         saveUninitialized: true,
-        resave: true
-        /*
-        // Fix for A5 - Security MisConfig
-        // Use generic cookie name
-        key: "sessionId",
-        */
-
-        /*
-        // Fix for A3 - XSS
-        // TODO: Add "maxAge"
         cookie: {
-            httpOnly: true
-            // Remember to start an HTTPS server to get this working
-            // secure: true
+            httpOnly: true,
+            secure: true
         }
-        */
-
     }));
 
-    /*
-    // Fix for A8 - CSRF
-    // Enable Express csrf protection
+
+    // A8 - CSRF
     app.use(csrf());
-    // Make csrf token available in templates
     app.use(function(req, res, next) {
         res.locals.csrftoken = req.csrfToken();
         next();
     });
-    */
+
 
     // Register templating engine
     app.engine(".html", consolidate.swig);
@@ -133,25 +113,16 @@ MongoClient.connect(config.db, function(err, db) {
 
     // Template system setup
     swig.setDefaults({
-        // Autoescape disabled
-        autoescape: false
-        /*
-        // Fix for A3 - XSS, enable auto escaping
+
+        // A3 - XSS
         autoescape: true // default value
-        */
+
     });
 
-    // Insecure HTTP connection
-    http.createServer(app).listen(config.port, function() {
-        console.log("Express http server listening on port " + config.port);
-    });
 
-    /*
-    // Fix for A6-Sensitive Data Exposure
-    // Use secure HTTPS protocol
+    // A6-Sensitive Data Exposure
     https.createServer(httpsOptions, app).listen(config.port,  function() {
         console.log("Express https server listening on port " + config.port);
     });
-    */
 
 });
